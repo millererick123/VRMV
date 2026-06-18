@@ -2,9 +2,10 @@
 """
 VRMV OwnerRez Automation Agent
 Usage:
-  python main.py            — run Phase 1 audit and print report
-  python main.py --json     — also save full results to audit_report_<timestamp>.json
-  python main.py --test     — only test API connectivity, then exit
+  python main.py                — run Phase 1 audit and print report
+  python main.py --interactive  — launch the interactive agent
+  python main.py --json         — save audit results to audit_report_<timestamp>.json
+  python main.py --test         — test API connectivity, then exit
 """
 
 import sys
@@ -19,6 +20,7 @@ def main():
     args = set(sys.argv[1:])
     save_json = "--json" in args
     test_only = "--test" in args
+    interactive = "--interactive" in args
 
     print("\nVRMV OwnerRez Automation Agent")
     print("=" * 40)
@@ -30,11 +32,15 @@ def main():
         print("Create a .env file based on .env.example and add your credentials.")
         sys.exit(1)
 
-    # --- Connection test ---
     print("\nTesting API connection...")
     try:
         data = client.test_connection()
-        count = data.get("total_count", data.get("total", "?")) if isinstance(data, dict) else len(data) if isinstance(data, list) else "?"
+        count = (
+            data.get("total_count", data.get("total", "?"))
+            if isinstance(data, dict)
+            else len(data) if isinstance(data, list)
+            else "?"
+        )
         print(f"  Connected successfully. ({count} properties visible)")
     except Exception as e:
         print(f"  Connection FAILED: {e}")
@@ -44,7 +50,11 @@ def main():
         print("\nConnection test passed. Exiting (--test mode).")
         return
 
-    # --- Phase 1 Audit ---
+    if interactive:
+        from agent import run_agent
+        run_agent(client)
+        return
+
     print("\nRunning Phase 1 audit...")
     try:
         result = audit(client)
@@ -56,7 +66,6 @@ def main():
     print(format_report(result))
 
     if save_json:
-        # Strip raw property/trigger/template data from saved JSON to keep it readable
         output = {k: v for k, v in result.items() if k != "raw"}
         ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         fname = f"audit_report_{ts}.json"
